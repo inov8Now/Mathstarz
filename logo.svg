@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 455 100">
+  <text x="8" y="64"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="64"
+        font-weight="700"
+        fill="#b7e3b4">Math Star</text>
+
+  <!-- Z matches text height and sits tight after R -->
+  <path
+    d="M336 22 L404 22 L350 64 L418 64"
+    fill="none"
+    stroke="#62c94a"
+    stroke-width="10"
+    stroke-linecap="butt"
+    stroke-linejoin="miter" />
+
+  <line x1="10" y1="80" x2="430" y2="80"
+        stroke="#62c94a"
+        stroke-width="7"
+        stroke-linecap="round" />
+
+  <polygon
+    fill="#2f6fbf"
+    transform="translate(432 80) scale(1.05)"
+    points="0,-22 6.3,-6.8 23,-6.8 9.5,3.2 14.6,19.2 0,10.2 -14.6,19.2 -9.5,3.2 -23,-6.8 -6.3,-6.8" />
+</svg>
