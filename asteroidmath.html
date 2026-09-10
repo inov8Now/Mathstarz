@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>Equation Asteroids | Math Starz</title>
+  <style>
+    :root {
+      --bg: #070b12;
+      --panel: #121826;
+      --line: #2a3548;
+      --text: #e8eef8;
+      --muted: #8ea0b8;
+      --good: #62c94a;
+      --ten: #4aa3ff;
+      --one: #f5c542;
+      --bad: #f66;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; overflow: hidden; }
+    #wrap { display: flex; flex-direction: column; height: 100%; }
+    header {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+      padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line);
+    }
+    h1 { font-size: 16px; margin: 0; color: #b7e3b4; white-space: nowrap; }
+    .stat { font-variant-numeric: tabular-nums; font-weight: 700; }
+    .stat span { color: var(--muted); font-weight: 500; margin-right: 4px; }
+    label.speed { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+    input[type=range] { width: 120px; accent-color: var(--good); }
+    button.ui {
+      border: 0; border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer;
+      background: var(--good); color: #06210a;
+    }
+    button.ui.ghost { background: #2a3344; color: var(--text); }
+    canvas { display: block; width: 100%; flex: 1; background: radial-gradient(#132033, #070b12); touch-action: none; }
+    #hud {
+      display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+      padding: 8px 12px 12px; background: var(--panel); border-top: 1px solid var(--line);
+    }
+    .hint { font-size: 13px; color: var(--muted); line-height: 1.35; }
+    .pads { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pads button {
+      min-width: 64px; height: 48px; border: 0; border-radius: 10px;
+      font-weight: 800; font-size: 16px; cursor: pointer; color: #fff;
+    }
+    .pads .left, .pads .right, .pads .thrust { background: #2a3344; }
+    .pads .ten { background: var(--ten); }
+    .pads .one { background: #c99512; color: #1a1200; }
+    .overlay {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,.55); z-index: 2;
+    }
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+      padding: 22px 24px; max-width: 420px; text-align: center;
+    }
+    .card h2 { margin: 0 0 8px; }
+    .card p { color: var(--muted); margin: 0 0 16px; }
+    .hidden { display: none; }
+    kbd { background: #2a3344; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <header>
+      <h1>Equation Asteroids</h1>
+      <div class="stat"><span>Score</span><b id="score">0</b></div>
+      <div class="stat"><span>Solved</span><b id="solved">0</b></div>
+      <div class="stat"><span>Lives</span><b id="lives">3</b></div>
+      <label class="speed">Speed
+        <input id="speed" type="range" min="1" max="10" value="2" />
+        <b id="speedVal">2</b>
+      </label>
+      <button class="ui" id="startBtn">Start</button>
+      <button class="ui ghost" id="pauseBtn">Pause</button>
+    </header>
+    <canvas id="c"></canvas>
+    <div id="hud">
+      <div class="hint">
+        Hit a rock until your shots equal the answer.<br>
+        <kbd>←</kbd><kbd>→</kbd> turn · <kbd>↑</kbd> thrust · <kbd>Z</kbd> shoot +10 · <kbd>X</kbd> or <kbd>Space</kbd> shoot +1<br>
+        Exact answer smashes it. Too many resets that rock.
+      </div>
+      <div class="pads">
+        <button class="left" data-hold="left">◀</button>
+        <button class="right" data-hold="right">▶</button>
+        <button class="thrust" data-hold="up">▲</button>
+        <button class="ten" data-tap="ten">+10</button>
+        <button class="one" data-tap="one">+1</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="splash">
+    <div class="card">
+      <h2>Split the answer. Smash the rock.</h2>
+      <p>Each asteroid shows a simple equation. Shoot <b>+10</b> and <b>+1</b> until the total equals the answer. Start slow.</p>
+      <button class="ui" id="goBtn">Play</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d");
+    const $ = (id) => document.getElementById(id);
+
+    const keys = { left: false, right: false, up: false };
+    let W = 800, H = 600, running = false, paused = false;
+    let score = 0, solved = 0, lives = 3, speedMul = 2;
+    let ship, rocks = [], shots = [], particles = [], cooldown = 0, invuln = 0, flash = 0;
+
+    function resize() {
+      const r = canvas.getBoundingClientRect();
+      W = canvas.width = Math.max(480, Math.floor(r.width * devicePixelRatio));
+      H = canvas.height = Math.max(320, Math.floor(r.height * devicePixelRatio));
+    }
+    window.addEventListener("resize", resize);
+
+    function rand(a, b) { return a + Math.random() * (b - a); }
+    function irand(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+    function wrap(v, max) { return v < 0 ? v + max : v > max ? v - max : v; }
+
+    function makeProblem() {
+      const kind = Math.random() < 0.7 ? "+" : "-";
+      let a, b, ans, text;
+      if (kind === "+") {
+        a = irand(1, 20);
+        b = irand(1, 20);
+        ans = a + b;
+        text = a + " + " + b;
+      } else {
+        a = irand(6, 30);
+        b = irand(1, Math.min(9, a - 1));
+        ans = a - b;
+        text = a + " − " + b;
+      }
+      return { text, ans };
+    }
+
+    function spawnRock(fromSplit) {
+      const p = makeProblem();
+      let x, y;
+      if (fromSplit) {
+        x = fromSplit.x + rand(-20, 20);
+        y = fromSplit.y + rand(-20, 20);
+      } else {
+        const edge = irand(0, 3);
+        x = edge === 0 || edge === 1 ? rand(0, W) : edge === 2 ? 0 : W;
+        y = edge === 0 ? 0 : edge === 1 ? H : rand(0, H);
+      }
+      const r = fromSplit ? 28 : rand(34, 48);
+      const s = 0.12 + speedMul * 0.07;
+      return {
+        x, y, r,
+        vx: rand(-s, s) * (0.6 + Math.random()),
+        vy: rand(-s, s) * (0.6 + Math.random()),
+        rot: rand(0, Math.PI * 2),
+        spin: rand(-0.012, 0.012),
+        verts: makeVerts(r),
+        text: p.text,
+        ans: p.ans,
+        got: 0
+      };
+    }
+
+    function makeVerts(r) {
+      const n = irand(7, 11);
+      const v = [];
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        v.push({ a, d: r * rand(0.72, 1.08) });
+      }
+      return v;
+    }
+
+    function resetShip() {
+      ship = { x: W / 2, y: H / 2, a: -Math.PI / 2, vx: 0, vy: 0 };
+      invuln = 120;
+    }
+
+    function startGame() {
+      score = 0; solved = 0; lives = 3;
+      rocks = []; shots = []; particles = [];
+      resetShip();
+      for (let i = 0; i < 4; i++) rocks.push(spawnRock());
+      running = true; paused = false;
+      $("splash").classList.add("hidden");
+      updateHud();
+    }
+
+    function updateHud() {
+      $("score").textContent = score;
+      $("solved").textContent = solved;
+      $("lives").textContent = lives;
+    }
+
+    function boom(x, y, color, n) {
+      for (let i = 0; i < n; i++) {
+        particles.push({
+          x, y,
+          vx: rand(-2.2, 2.2), vy: rand(-2.2, 2.2),
+          life: irand(18, 36), color
+        });
+      }
+    }
+
+    function fire(inc) {
+      if (!running || paused || cooldown > 0) return;
+      cooldown = inc === 10 ? 14 : 8;
+      const speed = 7.2;
+      shots.push({
+        x: ship.x + Math.cos(ship.a) * 18,
+        y: ship.y + Math.sin(ship.a) * 18,
+        vx: Math.cos(ship.a) * speed + ship.vx,
+        vy: Math.sin(ship.a) * speed + ship.vy,
+        life: 70,
+        inc
+      });
+    }
+
+    function hitRock(rock, inc) {
+      rock.got += inc;
+      if (rock.got === rock.ans) {
+        score += 10 + rock.ans;
+        solved++;
+        boom(rock.x, rock.y, "#62c94a", 22);
+        rocks = rocks.filter(r => r !== rock);
+        rocks.push(spawnRock());
+        if (solved % 5 === 0) rocks.push(spawnRock());
+        updateHud();
+        return;
+      }
+      if (rock.got > rock.ans) {
+        boom(rock.x, rock.y, "#f66", 10);
+        rock.got = 0;
+        flash = 8;
+      } else {
+        boom(rock.x, rock.y, inc === 10 ? "#4aa3ff" : "#f5c542", 8);
+      }
+    }
+
+    function shipHit() {
+      if (invuln > 0) return;
+      lives--;
+      updateHud();
+      boom(ship.x, ship.y, "#fff", 18);
+      if (lives <= 0) {
+        running = false;
+        $("splash").classList.remove("hidden");
+        $("splash").querySelector("h2").textContent = "Game over — " + solved + " solved";
+        $("splash").querySelector("p").textContent = "Score " + score + ". Slow the speed slider and try again.";
+        $("goBtn").textContent = "Play again";
+        return;
+      }
+      resetShip();
+    }
+
+    function step() {
+      if (running && !paused) {
+        if (keys.left) ship.a -= 0.055;
+        if (keys.right) ship.a += 0.055;
+        if (keys.up) {
+          ship.vx += Math.cos(ship.a) * 0.12;
+          ship.vy += Math.sin(ship.a) * 0.12;
+        }
+        ship.vx *= 0.99;
+        ship.vy *= 0.99;
+        ship.x = wrap(ship.x + ship.vx, W);
+        ship.y = wrap(ship.y + ship.vy, H);
+        if (cooldown > 0) cooldown--;
+        if (invuln > 0) invuln--;
+        if (flash > 0) flash--;
+
+        const spd = 0.55 + speedMul * 0.22;
+        for (const r of rocks) {
+          r.x = wrap(r.x + r.vx * spd, W);
+          r.y = wrap(r.y + r.vy * spd, H);
+          r.rot += r.spin;
+          const dx = r.x - ship.x, dy = r.y - ship.y;
+          if (dx * dx + dy * dy < (r.r - 6) * (r.r - 6)) shipHit();
+        }
+
+        for (const s of shots) {
+          s.x += s.vx; s.y += s.vy; s.life--;
+        }
+        shots = shots.filter(s => s.life > 0 && s.x > -20 && s.x < W + 20 && s.y > -20 && s.y < H + 20);
+
+        for (const s of shots) {
+          for (const r of rocks) {
+            const dx = r.x - s.x, dy = r.y - s.y;
+            if (dx * dx + dy * dy < r.r * r.r) {
+              s.life = 0;
+              hitRock(r, s.inc);
+              break;
+            }
+          }
+        }
+        shots = shots.filter(s => s.life > 0);
+
+        for (const p of particles) {
+          p.x += p.vx; p.y += p.vy; p.life--;
+        }
+        particles = particles.filter(p => p.life > 0);
+      }
+      draw();
+      requestAnimationFrame(step);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      ctx.save();
+      if (flash) {
+        ctx.fillStyle = "rgba(255,60,60,0.08)";
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      for (const p of particles) {
+        ctx.globalAlpha = Math.min(1, p.life / 20);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 3 * devicePixelRatio, 3 * devicePixelRatio);
+      }
+      ctx.globalAlpha = 1;
+
+      for (const r of rocks) {
+        ctx.save();
+        ctx.translate(r.x, r.y);
+        ctx.rotate(r.rot);
+        ctx.beginPath();
+        r.verts.forEach((v, i) => {
+          const x = Math.cos(v.a) * v.d, y = Math.sin(v.a) * v.d;
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        });
+        ctx.closePath();
+        ctx.strokeStyle = r.got > 0 ? "#8fd27a" : "#9eb0c8";
+        ctx.lineWidth = 2 * devicePixelRatio;
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#fff";
+        ctx.font = "700 " + Math.round(16 * devicePixelRatio) + "px system-ui";
+        ctx.fillText(r.text, r.x, r.y - 8 * devicePixelRatio);
+        ctx.fillStyle = r.got === 0 ? "#8ea0b8" : "#f5c542";
+        ctx.font = "700 " + Math.round(14 * devicePixelRatio) + "px system-ui";
+        ctx.fillText(r.got + " / " + r.ans, r.x, r.y + 12 * devicePixelRatio);
+      }
+
+      for (const s of shots) {
+        ctx.fillStyle = s.inc === 10 ? "#4aa3ff" : "#f5c542";
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.inc === 10 ? 4.2 * devicePixelRatio : 2.6 * devicePixelRatio, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "700 " + Math.round(11 * devicePixelRatio) + "px system-ui";
+        ctx.textAlign = "center";
+        ctx.fillText(s.inc === 10 ? "10" : "1", s.x, s.y - 10 * devicePixelRatio);
+      }
+
+      if (ship) {
+        ctx.save();
+        ctx.translate(ship.x, ship.y);
+        ctx.rotate(ship.a);
+        if (invuln <= 0 || Math.floor(invuln / 4) % 2 === 0) {
+          ctx.beginPath();
+          ctx.moveTo(16 * devicePixelRatio, 0);
+          ctx.lineTo(-12 * devicePixelRatio, 10 * devicePixelRatio);
+          ctx.lineTo(-7 * devicePixelRatio, 0);
+          ctx.lineTo(-12 * devicePixelRatio, -10 * devicePixelRatio);
+          ctx.closePath();
+          ctx.strokeStyle = "#b7e3b4";
+          ctx.lineWidth = 2 * devicePixelRatio;
+          ctx.stroke();
+          if (keys.up) {
+            ctx.beginPath();
+            ctx.moveTo(-12 * devicePixelRatio, 5 * devicePixelRatio);
+            ctx.lineTo(-20 * devicePixelRatio, 0);
+            ctx.lineTo(-12 * devicePixelRatio, -5 * devicePixelRatio);
+            ctx.strokeStyle = "#f5c542";
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
+      if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
+      if (e.code === "ArrowUp" || e.code === "KeyW") keys.up = true;
+      if (e.code === "KeyZ") { e.preventDefault(); fire(10); }
+      if (e.code === "KeyX" || e.code === "Space") { e.preventDefault(); fire(1); }
+      if (e.code === "KeyP") paused = !paused;
+    });
+    window.addEventListener("keyup", (e) => {
+      if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
+      if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
+      if (e.code === "ArrowUp" || e.code === "KeyW") keys.up = false;
+    });
+
+    document.querySelectorAll("[data-hold]").forEach(btn => {
+      const k = btn.dataset.hold;
+      const on = (e) => { e.preventDefault(); keys[k] = true; };
+      const off = (e) => { e.preventDefault(); keys[k] = false; };
+      btn.addEventListener("mousedown", on);
+      btn.addEventListener("mouseup", off);
+      btn.addEventListener("mouseleave", off);
+      btn.addEventListener("touchstart", on, { passive: false });
+      btn.addEventListener("touchend", off);
+    });
+    document.querySelectorAll("[data-tap]").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        fire(btn.dataset.tap === "ten" ? 10 : 1);
+      });
+    });
+
+    $("speed").oninput = () => {
+      speedMul = +$("speed").value;
+      $("speedVal").textContent = speedMul;
+    };
+    $("startBtn").onclick = startGame;
+    $("goBtn").onclick = startGame;
+    $("pauseBtn").onclick = () => { if (running) paused = !paused; };
+
+    resize();
+    resetShip();
+    rocks = [spawnRock(), spawnRock(), spawnRock()];
+    step();
+  </script>
+</body>
+</html>
