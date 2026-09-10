@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Split or Smash | Math Starz</title>
+  <style>
+    body { margin:0; font-family:system-ui,sans-serif; background:#111; color:#eee; text-align:center; }
+    h1 { font-size:20px; color:#b7e3b4; margin:16px 0 8px; }
+    .num { font-size:96px; font-weight:800; margin:10px 0; color:#fff; }
+    .hint { color:#9c9; min-height:24px; }
+    .row { display:flex; justify-content:center; gap:24px; margin:18px; }
+    .col h2 { font-size:14px; color:#8c8; }
+    button {
+      width:64px; height:48px; margin:4px; border:0; border-radius:10px;
+      background:#2ecc40; color:#fff; font-size:20px; font-weight:700; cursor:pointer;
+    }
+    button.ghost { background:#333; }
+    .pile { min-height:48px; font-size:28px; letter-spacing:4px; }
+    .bar { width:280px; height:10px; margin:12px auto; background:#333; border-radius:6px; overflow:hidden; }
+    .fill { height:100%; width:100%; background:#62c94a; }
+    .msg { min-height:28px; font-weight:700; }
+    .ok { color:#6f6; } .bad { color:#f66; }
+  </style>
+</head>
+<body>
+  <h1>Split or Smash</h1>
+  <button id="startBtn">Start</button>
+<button class="ghost" id="stopBtn">Stop</button>
+  <div class="num" id="num">36</div>
+  <div class="hint">Make this number with tens and ones</div>
+  <div class="bar"><div class="fill" id="fill"></div></div>
+  <div class="row">
+    <div class="col">
+      <h2>Tens</h2>
+      <div class="pile"><span id="tensPile">—</span> <b id="tensCount">0</b></div>
+      <button id="tenAdd">+10</button>
+      <button class="ghost" id="tenSub">−10</button>
+    </div>
+    <div class="col">
+      <h2>Ones</h2>
+      <div class="pile"><span id="onesPile">—</span> <b id="onesCount">0</b></div>
+      <button id="oneAdd">+1</button>
+      <button class="ghost" id="oneSub">−1</button>
+    </div>
+  </div>
+  <div class="msg" id="msg">Go</div>
+  <p id="score">Score 0</p>
+
+  <script>
+    let target = 36, tens = 0, ones = 0, score = 0, t0 = 0, lock = false;
+    let running = false;
+    const TIME = 8000;
+
+    const $ = (id) => document.getElementById(id);
+
+function deal() {
+  if (!running) return;
+  target = 1 + Math.floor(Math.random() * 100);
+  tens = ones = 0;
+  lock = false;
+  t0 = performance.now();
+  $("num").textContent = target;
+  $("msg").textContent = "Go";
+  $("msg").className = "msg";
+  render();
+  tick();
+}
+
+    function render() {
+  $("tensPile").textContent = tens ? "■".repeat(tens) : "—";
+  $("onesPile").textContent = ones ? "•".repeat(ones) : "—";
+  $("tensCount").textContent = tens;
+  $("onesCount").textContent = ones;
+}
+
+    function smash() {
+      if (lock) return;
+      const val = tens * 10 + ones;
+      lock = true;
+      if (val === target) {
+        score++;
+        $("msg").textContent = "Smash!";
+        $("msg").className = "msg ok";
+      } else {
+        $("msg").textContent = val + " is not " + target;
+        $("msg").className = "msg bad";
+      }
+      $("score").textContent = "Score " + score;
+      setTimeout(deal, 700);
+    }
+
+    function tick() {
+      if (lock) return;
+      const left = Math.max(0, TIME - (performance.now() - t0));
+      $("fill").style.width = (left / TIME * 100) + "%";
+      if (left <= 0) {
+        $("msg").textContent = "Time! It was " + Math.floor(target/10) + " tens and " + (target%10) + " ones";
+        $("msg").className = "msg bad";
+        lock = true;
+        setTimeout(deal, 1100);
+        return;
+      }
+      if (tens * 10 + ones === target) smash();
+      else requestAnimationFrame(tick);
+    }
+
+    $("tenAdd").onclick = () => { if (!lock && tens < 10) { tens++; render(); } };
+    $("tenSub").onclick = () => { if (!lock && tens > 0) { tens--; render(); } };
+    $("oneAdd").onclick = () => { if (!lock && ones < 9) { ones++; render(); } };
+    $("oneSub").onclick = () => { if (!lock && ones > 0) { ones--; render(); } };
+
+    $("startBtn").onclick = () => {
+  if (running) return;
+  running = true;
+  score = 0;
+  $("score").textContent = "Score 0";
+  $("msg").textContent = "Go";
+  deal();
+};
+
+$("stopBtn").onclick = () => {
+  running = false;
+  lock = true;
+  $("msg").textContent = "Stopped";
+  $("fill").style.width = "0%";
+};
+  </script>
+</body>
+</html>

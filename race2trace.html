@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mathstarz</title>
+  
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+</head>
+  <nav class="top-bar">
+    <a class="logo" href="/">
+      <img src="logo.svg" alt="Math Starz" />
+    </a>
+    <!--a class="glossy-btn" href="#">Home</a-->
+    <a class="glossy-btn" href="products.html">Products</a>
+    <a class="glossy-btn" href="#">About</a>
+    <a class="glossy-btn" href="#">Contact</a>
+  </nav>
+
+ <section class="garage">
+  <p>Pick a car</p>
+  <button data-car="cars/red.svg"><img src="cars/red.svg" alt="Red car" width="64"></button>
+  <button data-car="cars/green.svg"><img src="cars/green.svg" alt="Green car" width="64"></button>
+  <button data-car="cars/blue.svg"><img src="cars/blue.svg" alt="Blue car" width="64"></button>
+  <button id="startBtn">Start race</button>
+</section>
+
+  <div class="hud">
+    Number <span id="n">1</span> / 100
+    <span id="status">Choose a car</span>
+  </div>
+
+  <main class="game">
+  <section class="panel">
+    <h2>You</h2>
+    <div class="stage" id="youStage"></div>
+  </section>
+  <section class="panel">
+    <h2>Car</h2>
+    <div class="stage" id="carStage"></div>
+  </section>
+</main>
+<script src="js/race2trace.js"></script>
+  <!--#youStage, #carStage, #startBtn, #n, and #status-->
+  <!--#youStage, #carStage-->
